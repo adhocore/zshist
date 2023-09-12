@@ -58,9 +58,11 @@ func handle(src, bak string) {
 	defer zsh.Close()
 
 	// zsh pre history
-	if hist, err := os.Open(*home + "/.zsh_history.pre-oh-my-zsh"); err == nil {
-		defer hist.Close()
+	pre := *home + "/.zsh_history.pre-oh-my-zsh"
+	if hist, err := os.Open(pre); err == nil {
 		parse(hist)
+		hist.Close()
+		os.Rename(pre, pre+".bak")
 	}
 
 	// bash history
@@ -94,24 +96,26 @@ func parse(file *os.File) {
 			line += "\n" + scan.Text()
 		}
 
-		key, val := "", ""
+		cmd, ts := "", ""
 		sub := zshline.FindAllStringSubmatch(line, 1)
 		if len(sub) > 0 {
-			key, val = strings.Trim(sub[0][2], " \t"), sub[0][1]
+			cmd, ts = strings.Trim(sub[0][2], " \t"), sub[0][1]
 		} else {
-			key, val, nomatch = line, fmt.Sprintf("%d", nomatch), nomatch+1
-		}
-
-		if val == "" || val[0] == '#' {
-			continue
-		}
-
-		if _, ok := lines[key]; !ok {
-			keys = append(keys, key)
+			cmd, ts, nomatch = line, fmt.Sprintf("%d", nomatch), nomatch+1
 		}
 
 		cmdCt++
-		lines[key] = val
+		if cmd == "" || cmd[0] == '#' {
+			continue
+		}
+
+		ots, ok := lines[cmd]
+		if !ok {
+			keys = append(keys, cmd)
+		}
+		if !ok || ts > ots {
+			lines[cmd] = ts
+		}
 	}
 
 	fileCt++
